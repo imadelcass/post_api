@@ -1,27 +1,19 @@
 <?php
 
-use Illuminate\Http\Request;
-use App\Http\Controllers\PostController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\PostController;
 use Illuminate\Support\Facades\Route;
 
-
-Route::post("/login", [PostController::class, 'login']);
-
-
-Route::get("/posts", [PostController::class, 'index']);
-Route::get("/categories", [CategoryController::class, 'index']);
+Route::post("/login", [AuthController::class, 'login']);
+Route::apiResource('post', PostController::class)->only(['index', 'show']);
+Route::apiResource('category', CategoryController::class)->only(['index', 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post("/post/create", [PostController::class, 'create']);
-    Route::post("/post/update", [PostController::class, 'update']);
-    Route::delete("/post/destroy", [PostController::class, 'destroy']);
+    Route::prefix('/')->group(function () {
+        Route::post("logout", [AuthController::class, 'logout']);
+        Route::get("auth", [AuthController::class, 'auth']);
+    });
+    Route::apiResource('post', PostController::class)->except(['index', 'show']);
+    Route::apiResource('category', CategoryController::class)->except(['index', 'show']);
 });
-
-Route::middleware(['auth:sanctum', 'admin'])->group(function () {
-    Route::post("/category/create", [CategoryController::class, 'create']);
-    Route::post("/category/update", [CategoryController::class, 'update']);
-    Route::delete("/category/destroy", [CategoryController::class, 'destroy']);
-});
-
-

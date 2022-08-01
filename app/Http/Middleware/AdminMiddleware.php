@@ -19,7 +19,7 @@ class AdminMiddleware
     public function handle(Request $request, Closure $next)
     {
         $user = Auth::user();
-        if ($user->isAdmin) {
+        if ($user->is_admin) {
             return $next($request);
         } else {
             return response()->json(

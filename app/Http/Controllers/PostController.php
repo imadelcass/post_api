@@ -1,114 +1,89 @@
 <?php
 
 namespace App\Http\Controllers;
-use App\Models\User;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Http\Request;
+
+use App\Http\Requests\StorePostRequest;
+use App\Http\Requests\UpdatePostRequest;
 use App\Models\Post;
-use Validator;
-
-
+use GuzzleHttp\Psr7\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 
 class PostController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * Display a listing of the resource.
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function index()
     {
-        $posts = DB::table('posts');
-        
-        if($request->user_id){
-            //user posts by (user_id)
-            return $posts->where('user_id', $request->user_id);   
-            
-        }elseif ($request->id) {
-            //single post by (id) 
-            return $posts->where('id', $request->id)->first();   
-        }
-        else{
-            //all posts
-            return $posts->get();
-        }
+        return response()->json(Post::with('category')->latest()->get());
     }
 
-    public function create(Request $request)
+    /**
+     * Store a newly created resource in storage.
+     *
+     * @param  \App\Http\Requests\StorePostRequest  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function store(StorePostRequest $request)
     {
-        $validator = Validator::make($request->all(),[
-            'title' => 'required|unique:posts|max:255',
-            'body' => 'required',
-            'user_id' => 'required|exists:users,id',
-            'category_id' => 'required|exists:categories,id',
+        $post = Post::create([
+            "title" => $request->title,
+            "body" => $request->body,
+            "category_id" => $request->category_id,
+            "user_id" => Auth::user()->id,
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                "success" => false,
-            ]);
-        } else {
-            $post = Post::create($request->all());
+        return response()->json([
+            "success" => true,
+            "post" => Post::with('category')->where('id', $post->id)->get(),
+            "msg" => "The post is created"], 201);
+    }
+
+    /**
+     * Display the specified resource.
+     *
+     * @param  \App\Models\Post  $post
+     * @return \Illuminate\Http\Response
+     */
+    public function show(Post $post)
+    {
+        return response()->json(Post::with('category')->where('id', $post->id)->get());
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param  \App\Http\Requests\UpdatePostRequest  $request
+     * @param  \App\Models\Post  $post
+     * @return \Illuminate\Http\Response
+     */
+    public function update(UpdatePostRequest $request, Post $post)
+    {
+        $post->update($request->only(["title", "body", "category_id"]));
+        return response()->json([
+            "success" => true,
+            "post" => Post::with('category')->where('id', $post->id)->get(),
+            "msg" => "The post is updated"]);
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     *
+     * @param  \App\Models\Post  $post
+     * @return \Illuminate\Http\Response
+     */
+    public function destroy(Post $post)
+    {
+        if (Gate::allows('delete-post', $post)) {
+            $post->delete();
             return response()->json([
                 "success" => true,
-            ]);
+                "post" => $post,
+                "msg" => "The post is deleted"]);
         }
-    }
-    public function update(Request $request)
-    {
-        $user = Auth::user();
-        if(!$user->isAdmin && $user->id != $request->user_id){
-            return response()->json([
-                "success" => false,
-                "msg" => "not your post",
-            ]);
-        }else{
-
-            $validator = Validator::make($request->all(),[
-                'title' => 'required|max:255',
-                'body' => 'required',
-                'user_id' => 'required|exists:users,id',
-                'category_id' => 'required|exists:categories,id',
-            ]);
-            
-            if ($validator->fails()) {
-                return response()->json([
-                    "success" => false,
-                ]);
-            } else {
-                Post::where('id', $request->id)->update($request->all());
-                return response()->json([
-                    "success" => true,
-                    "user" => $user,
-                ]);
-            }
-        }
-    }
-
-    public function destroy(Request $request)
-    {
-        $user = Auth::user();
-        if(!$user->isAdmin && $user->id != $request->user_id){
-            return response()->json([
-                "success" => false,
-                "msg" => "not your post",
-            ]);
-        }else{
-            $post = Post::where('id', $request->id)->delete();
-            if (!Post::where('id', $request->id)->exists()) {
-                return response()->json([
-                    "success" => true,
-                ]);
-            }
-        }
-    }
-
-    public function login(Request $request)
-    {
-        if (Auth::attempt($request->only('name', 'password'))) {
-            $user = Auth::user();
-            $token = User::find($user->id)->createToken('auth_token')->plainTextToken;
-            return response()->json([
-                'user' => $user,
-                'success' => true,
-                'token' => $token,
-            ]);
-        }
+        return response()->json(["success" => false, "msg" => "The post is not deleted"], 403);
     }
 }
